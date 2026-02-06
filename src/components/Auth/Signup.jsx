@@ -166,6 +166,39 @@ const Signup = ({ onSwitchToLogin }) => {
         return;
       }
 
+      // Create initial personal_details record for new user
+      if (data?.user?.id) {
+        try {
+          const { error: dbError } = await client
+            .from("personal_details")
+            .insert({
+              user_id: data.user.id,
+              current_step: 1,
+              completed: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+
+          if (dbError) {
+            console.error("Error creating user profile:", dbError);
+            // Log detailed error for debugging
+            console.error("Database error details:", {
+              message: dbError.message,
+              code: dbError.code,
+              details: dbError.details,
+              hint: dbError.hint,
+            });
+            // Don't fail signup if profile creation fails - user can still login
+            // The profile will be created on first login or onboarding step
+            toast.warning("Account created, but profile setup may be delayed. You can still log in.");
+          }
+        } catch (dbErr) {
+          console.error("Error creating user profile:", dbErr);
+          // Don't fail signup if profile creation fails
+          toast.warning("Account created, but profile setup may be delayed. You can still log in.");
+        }
+      }
+
       // If user selected an avatar, store it locally and upload after the first successful login.
       // Reason: when email confirmation is enabled, signUp() may not return an auth session yet.
       if (avatarFile && data?.user?.id) {

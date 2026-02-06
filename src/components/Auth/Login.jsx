@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import client from "@/api/client";
 import { toast } from "sonner";
 
 const Login = ({ onSwitchToSignup }) => {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
   const [errors, setErrors] = useState({
@@ -25,7 +27,7 @@ const Login = ({ onSwitchToSignup }) => {
         provider: "github",
         options: {
           redirectTo:
-            typeof window !== "undefined" ? `${window.location.origin}/dashboard` : undefined,
+            typeof window !== "undefined" ? `${window.location.origin}/onboarding/step-1` : undefined,
         },
       });
 
@@ -76,7 +78,7 @@ const Login = ({ onSwitchToSignup }) => {
     }
 
     try {
-      const { error } = await client.auth.signInWithPassword({
+      const { data: authData, error } = await client.auth.signInWithPassword({
         email,
         password,
       });
@@ -97,8 +99,46 @@ const Login = ({ onSwitchToSignup }) => {
         return;
       }
 
+      // Ensure user has a personal_details record (create if missing)
+      if (authData?.user?.id) {
+        try {
+          const { data: existingProfile } = await client
+            .from("personal_details")
+            .select("user_id")
+            .eq("user_id", authData.user.id)
+            .maybeSingle();
+
+          if (!existingProfile) {
+            // Create initial record if it doesn't exist
+            const { error: dbError } = await client
+              .from("personal_details")
+              .insert({
+                user_id: authData.user.id,
+                current_step: 1,
+                completed: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              });
+
+            if (dbError) {
+              console.error("Error creating user profile:", dbError);
+              toast.error("Database error saving new user. Please try again.");
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (dbErr) {
+          console.error("Error checking/creating user profile:", dbErr);
+          toast.error("Database error saving new user. Please try again.");
+          setLoading(false);
+          return;
+        }
+      }
+
       toast.success("Logged in successfully!");
       clearErrors();
+      // Redirect to onboarding step 1
+      router.push("/onboarding/step-1");
     } catch (err) {
       console.error(err);
       setErrors((prev) => ({ ...prev, password: "Something went wrong. Please try again." }));

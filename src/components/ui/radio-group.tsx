@@ -41,12 +41,12 @@ function RadioGroup({
   );
 }
 
-interface RadioGroupItemProps
-  extends React.ComponentProps<typeof RadioGroupPrimitive.Item> {
+interface RadioGroupItemProps extends React.ComponentProps<typeof RadioGroupPrimitive.Item> {
   size?: RadioSize;
   label?: React.ReactNode;
   labelPadding?: LabelPadding;
   id: string;
+  labelClassName?: string;
 }
 
 function RadioGroupItem({
@@ -55,12 +55,11 @@ function RadioGroupItem({
   labelPadding,
   label,
   disabled,
+  labelClassName,
   id,
   ...props
 }: RadioGroupItemProps) {
-  const finalLabelClass = labelPadding
-    ? labelPaddingMap[labelPadding]
-    : defaultLabelMap[size];
+  const finalLabelClass = labelPadding ? labelPaddingMap[labelPadding] : defaultLabelMap[size];
 
   const labelFontMap: Record<RadioSize, string> = {
     sm: "text-base leading-tight tracking-4",
@@ -79,7 +78,7 @@ function RadioGroupItem({
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0",
         "disabled:bg-card disabled:data-[state=checked]:bg-accent disabled:data-[state=checked]:border-accent disabled:border-primary/12 disabled:hover:shadow-none disabled:cursor-not-allowed disabled:pointer-events-none",
         radioSizeMap[size],
-        className
+        className,
       )}
       {...props}
     >
@@ -88,7 +87,7 @@ function RadioGroupItem({
           className={cn(
             "fill-background text-background stroke-0",
             disabled && "fill-primary/15 text-primary/15",
-            iconSizeMap[size]
+            iconSizeMap[size],
           )}
         />
       </RadioGroupPrimitive.Indicator>
@@ -100,10 +99,10 @@ function RadioGroupItem({
       <label
         htmlFor={id}
         className={cn(
-          "flex items-center gap-x-2 cursor-pointer   text-accent-foreground rounded-lg hover:bg-accent active:bg-primary/12 w-fit focus:bg-secondary focus:ring-ring focus:ring-2 focus:ring-offset-0 focus-visible:ring-ring focus-visible:ring-2 focus-visible:bg-secondary ",
+          "flex items-center gap-x-2 cursor-pointer  text-accent-foreground rounded-lg hover:bg-accent active:bg-primary/12 w-fit focus:bg-secondary focus:ring-ring focus:ring-2 focus:ring-offset-0 focus-visible:ring-ring focus-visible:ring-2 focus-visible:bg-secondary ",
           finalLabelClass,
-          disabled &&
-            "hover:bg-transparent cursor-not-allowed pointer-events-none text-primary/50"
+          labelClassName,
+          disabled && "hover:bg-transparent cursor-not-allowed pointer-events-none text-primary/50",
         )}
       >
         {radio}
