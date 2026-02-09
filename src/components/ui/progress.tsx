@@ -17,6 +17,7 @@ interface ProgressProps
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   labelIcon?: React.ComponentType<any>;
   children?: React.ReactNode;
+  indicatorColor?: string;
 }
 
 const sizeMap = {
@@ -36,6 +37,7 @@ function Progress({
   labelName,
   labelIcon: LabelIcon,
   children,
+  indicatorColor,
   ...props
 }: ProgressProps) {
   const heightClass = sizeMap[size];
@@ -73,14 +75,18 @@ function Progress({
           <ProgressPrimitive.Indicator
             data-slot="progress-indicator"
             className={cn(
-              "bg-primary/96 h-full w-full flex-1 transition-all",
+              indicatorColor ? "" : "bg-primary/96",
+              "h-full w-full flex-1 transition-all",
               square
                 ? value >= 100
                   ? "rounded-none"
                   : "rounded-l-4xl rounded-r-none"
                 : "rounded-4xl "
             )}
-            style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
+            style={{ 
+              transform: `translateX(-${100 - (value || 0)}%)`,
+              backgroundColor: indicatorColor || undefined,
+            }}
           />
         </ProgressPrimitive.Root>
       ) : (
