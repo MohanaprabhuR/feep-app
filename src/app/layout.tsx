@@ -1,9 +1,13 @@
-
+import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/context/AuthProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 
+export const metadata: Metadata = {
+  title: "Feed Post",
+  description: "Feed Post Application",
+};
 
 export default function RootLayout({
   children,
@@ -12,16 +16,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-      >
-         <ThemeProvider
+      <body>
+        <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-        <AuthProvider>{children}</AuthProvider>
-        <Toaster />
+          <AuthProvider>{children}</AuthProvider>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

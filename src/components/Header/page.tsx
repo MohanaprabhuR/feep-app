@@ -46,19 +46,19 @@ const HeaderLayout = () => {
               Dashboard
             </Link>
             <Link
-              href=""
+              href="/"
               className=" hover:text-orange-500 transition-all duration-300 delay-100 font-medium text-base leading-6 tracking-none text-light-gray-800"
             >
               Your Policies
             </Link>
             <Link
-              href=""
+              href="/"
               className=" hover:text-orange-500 transition-all duration-300 delay-100 font-medium text-base leading-6 tracking-none text-light-gray-800"
             >
               Coverage
             </Link>
             <Link
-              href=""
+              href="/"
               className=" hover:text-orange-500 transition-all duration-300 delay-100 font-medium text-base leading-6 tracking-none text-light-gray-800"
             >
               Search
