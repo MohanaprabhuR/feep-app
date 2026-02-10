@@ -141,7 +141,25 @@ const Login = ({ onSwitchToSignup }) => {
       router.push("/onboarding/step-1");
     } catch (err) {
       console.error(err);
-      setErrors((prev) => ({ ...prev, password: "Something went wrong. Please try again." }));
+      
+      // Check for network/environment variable errors
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const isNetworkError = 
+        errorMessage.includes("Failed to fetch") ||
+        errorMessage.includes("fetch failed") ||
+        errorMessage.includes("NetworkError") ||
+        errorMessage.includes("environment variables are not configured");
+      
+      if (isNetworkError) {
+        setErrors((prev) => ({
+          ...prev,
+          email: "Unable to connect to server. Please check that Supabase environment variables are configured in Vercel.",
+        }));
+        toast.error("Configuration error: Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in Vercel.");
+      } else {
+        setErrors((prev) => ({ ...prev, password: errorMessage || "Something went wrong. Please try again." }));
+      }
+      
       setLoading(false);
     }
   };
