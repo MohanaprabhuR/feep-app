@@ -34,8 +34,9 @@ const HeaderLayout = () => {
     <>
       <Header className="shadow-[0_1px_0_0_rgba(255,94,0,0.1)] bg-[#FFF7ED] border-0 relative z-10 px-4">
         <>
-          <Image src={Logo} alt="logo" width={100} height={100} />
-
+          <Link href="/dashboard">
+            <Image src={Logo} alt="logo" width={100} height={100} />
+          </Link>
           <div className="flex items-center gap-x-8">
             <Link
               href="/dashboard"
@@ -46,8 +47,10 @@ const HeaderLayout = () => {
               Dashboard
             </Link>
             <Link
-              href="/"
-              className=" hover:text-orange-500 transition-all duration-300 delay-100 font-medium text-base leading-6 tracking-none text-light-gray-800"
+              href="/policies"
+              className={`font-medium text-base leading-6 tracking-none hover:text-orange-500 transition-all duration-300 delay-100 ${
+                isActive("/policies") ? "text-orange-500" : "text-light-gray-800"
+              }`}
             >
               Your Policies
             </Link>

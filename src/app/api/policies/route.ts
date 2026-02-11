@@ -1,6 +1,37 @@
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+type Policy = {
+  policyId: string;
+  type: string;
+  status: string;
+  provider: string;
+  providerLogo: string;
+  coverage: string;
+  premium: string;
+  claimAmount: string;
+  members: Array<{ name: string; avatar: string }>;
+  daysLeft: number;
+  renewalDate: string; // YYYY-MM-DD
+};
+
+// Per-user in-memory store: each user only sees their own policies. New users start with no policies.
+const policiesStore: Record<string, Policy[]> = {};
+
+function getPoliciesForUser(userId: string): Policy[] {
+  if (!userId) return [];
+  if (!policiesStore[userId]) {
+    // New user: no default policies, only show "Add policy" empty state
+    policiesStore[userId] = [];
+  }
+  return policiesStore[userId];
+}
+
+export async function GET(req: Request) {
+  const headersList = await headers();
+  const userId = headersList.get("X-User-Id") ?? req.headers.get("X-User-Id") ?? "";
+  const userPolicies = getPoliciesForUser(userId);
+
   const apiDocumentation = {
     apiVersion: "1.0.0",
     baseUrl: "https://api.plans.com/v1",
@@ -35,82 +66,7 @@ export async function GET() {
         getAllPolicies: {
           method: "GET",
           path: "/users/{userId}/policies",
-          response: [
-            {
-              policyId: "#0239886484",
-              type: "Health",
-              status: "Active",
-              provider: "Care Health Supreme",
-              providerLogo: "https://mockmind-api.uifaces.co/content/human/185.jpg",
-              coverage: "5 Lakhs",
-              premium: "$250/Year",
-              claimAmount: "2 claims",
-              members: [
-                {
-                  name: "Herman Mayoe",
-                  avatar: "https://mockmind-api.uifaces.co/content/human/80.jpg",
-                },
-                {
-                  name: "Sarah Mayoe",
-                  avatar: "https://mockmind-api.uifaces.co/content/human/81.jpg",
-                },
-                {
-                  name: "John Mayoe",
-                  avatar: "https://mockmind-api.uifaces.co/content/human/82.jpg",
-                },
-              ],
-              daysLeft: 2,
-              renewalDate: "2026-02-11",
-            },
-            {
-              policyId: "#0239886485",
-              type: "Auto",
-              status: "Active",
-              provider: "Motor Premium Plus",
-              providerLogo: "https://mockmind-api.uifaces.co/content/human/186.jpg",
-              coverage: "3 Lakhs",
-              premium: "$150/Year",
-              claimAmount: "None",
-              members: [
-                {
-                  name: "Herman Mayoe",
-                  avatar: "https://mockmind-api.uifaces.co/content/human/83.jpg",
-                },
-                {
-                  name: "Sarah Mayoe",
-                  avatar: "https://mockmind-api.uifaces.co/content/human/84.jpg",
-                },
-              ],
-              daysLeft: 10,
-              renewalDate: "2026-02-11",
-            },
-            {
-              policyId: "#0239886486",
-              type: "Home",
-              status: "Active",
-              provider: "Smart Home Shield",
-              providerLogo: "https://mockmind-api.uifaces.co/content/human/187.jpg",
-              coverage: "5 Lakhs",
-              premium: "$350/Year",
-              claimAmount: "None",
-              members: [
-                {
-                  name: "Herman Mayoe",
-                  avatar: "https://mockmind-api.uifaces.co/content/human/85.jpg",
-                },
-                {
-                  name: "Sarah Mayoe",
-                  avatar: "https://mockmind-api.uifaces.co/content/human/86.jpg",
-                },
-                {
-                  name: "John Mayoe",
-                  avatar: "https://mockmind-api.uifaces.co/content/human/87.jpg",
-                },
-              ],
-              daysLeft: 15,
-              renewalDate: "2026-02-11",
-            },
-          ],
+          response: userPolicies,
         },
         getPolicyById: {
           method: "GET",
@@ -410,4 +366,59 @@ export async function GET() {
     },
   };
   return NextResponse.json(apiDocumentation);
+}
+
+export async function POST(req: Request) {
+  try {
+    const headersList = await headers();
+    const userId = headersList.get("X-User-Id") ?? req.headers.get("X-User-Id") ?? "";
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized: X-User-Id header required" }, { status: 401 });
+    }
+
+    const body = (await req.json()) as Partial<Policy & { userId?: string }>;
+    const policyId = body.policyId?.toString().trim();
+    const type = body.type?.toString().trim();
+    const status = body.status?.toString().trim();
+    const provider = body.provider?.toString().trim();
+
+    if (!policyId || !type || !status || !provider) {
+      return NextResponse.json(
+        { error: "Missing required fields: policyId, type, status, provider" },
+        { status: 400 },
+      );
+    }
+
+    const userPolicies = getPoliciesForUser(userId);
+    if (userPolicies.some((p) => p.policyId === policyId)) {
+      return NextResponse.json({ error: "Policy with this ID already exists" }, { status: 409 });
+    }
+
+    const newPolicy: Policy = {
+      policyId,
+      type,
+      status,
+      provider,
+      providerLogo:
+        body.providerLogo?.toString().trim() ||
+        "https://mockmind-api.uifaces.co/content/human/188.jpg",
+      coverage: body.coverage?.toString().trim() || "-",
+      premium: body.premium?.toString().trim() || "-",
+      claimAmount: body.claimAmount?.toString().trim() || "None",
+      members: Array.isArray(body.members) ? body.members : [],
+      daysLeft: typeof body.daysLeft === "number" ? body.daysLeft : Number(body.daysLeft ?? 0) || 0,
+      renewalDate: body.renewalDate?.toString().trim() || "2026-02-11",
+    };
+
+    policiesStore[userId] = [newPolicy, ...userPolicies];
+
+    return NextResponse.json({
+      ok: true,
+      policy: newPolicy,
+      policies: policiesStore[userId],
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Invalid JSON";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }

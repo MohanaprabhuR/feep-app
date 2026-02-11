@@ -1,16 +1,11 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import {
-  CalendarIcon,
-  PlusIcon,
-} from "lucide-react";
-import React, { useEffect, useState, useMemo } from "react";
+import { PlusIcon } from "lucide-react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { format } from "date-fns";
-import { DropdownNavProps, DropdownProps } from "react-day-picker";
 import {
   Select,
   SelectContent,
@@ -18,10 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
 import PolicyCard from "@/components/common/PolicyCard";
+import useAuth from "@/hooks/useAuth";
 
 interface Policy {
   policyId: string;
@@ -48,153 +41,280 @@ interface ApiResponse {
 }
 
 const DashboardPage = () => {
+  const { user } = useAuth();
   const [apiData, setApiData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const handleCalendarChange = (
-    _value: string | number,
-    _e: React.ChangeEventHandler<HTMLSelectElement>,
-  ) => {
-    const _event = {
-      target: {
-        value: String(_value),
-      },
-    } as React.ChangeEvent<HTMLSelectElement>;
-    _e(_event);
+  const [policyId, setPolicyId] = useState("");
+  const generatePolicyId = () => {
+    const digits = Math.floor(Math.random() * 10 ** 10)
+      .toString()
+      .padStart(10, "0");
+    return `#${digits}`;
   };
-  // Fetch policies from API
-  useEffect(() => {
-    const fetchPolicies = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await fetch("/api/policies");
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    policyId: "",
+    policyName: "",
+    policyStatus: "",
+    policyProvider: "",
+    policyCoverage: "",
+    policyPremium: "",
+    policyClaimAmount: "",
+    policyDaysLeft: "",
+    policyMembers: "",
+  });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(
-            `Failed to fetch policies: ${response.status} ${response.statusText}. ${errorText}`,
-          );
-        }
+  const handleModalOpenChange = (open: boolean) => {
+    setIsModalOpen(open);
+    if (open) {
+      const newId = generatePolicyId();
+      setPolicyId(newId);
+      setFormData((prev) => ({ ...prev, policyId: newId }));
+    }
+  };
 
-        const data = await response.json();
-        setApiData(data);
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "An error occurred";
-        setError(errorMessage);
-        toast.error(`Failed to load policies: ${errorMessage}`);
-      } finally {
-        setLoading(false);
+  const fetchPolicies = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch("/api/policies", {
+        cache: "no-store",
+        headers: { "X-User-Id": user.id },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to fetch policies: ${response.status} ${response.statusText}. ${errorText}`,
+        );
       }
-    };
 
-    fetchPolicies();
-  }, []);
+      const data = await response.json();
+      setApiData(data);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      setError(errorMessage);
+      toast.error(`Failed to load policies: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  // Fetch policies from API (per user)
+  useEffect(() => {
+    if (user?.id) fetchPolicies();
+  }, [user?.id, fetchPolicies]);
 
   const policies: Policy[] = useMemo(() => {
     return apiData?.endpoints?.policies?.getAllPolicies?.response ?? [];
   }, [apiData]);
 
+  const handleAddPolicy = async () => {
+    if (submitting) return;
+    if (!user?.id) {
+      toast.error("You must be logged in to add a policy.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (!policyId || !formData.policyName || !formData.policyStatus || !formData.policyProvider) {
+        toast.error("Please fill Policy Name, Status, and Provider.");
+        return;
+      }
+
+      const daysLeftNum = Number(formData.policyDaysLeft || 0) || 0;
+
+      const members = (formData.policyMembers || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((name, i) => ({
+          name,
+          avatar: `https://mockmind-api.uifaces.co/content/human/${80 + i}.jpg`,
+        }));
+
+      const response = await fetch("/api/policies", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": user?.id ?? "",
+        },
+        body: JSON.stringify({
+          policyId,
+          type: formData.policyName,
+          status: formData.policyStatus,
+          provider: formData.policyProvider,
+          coverage: formData.policyCoverage,
+          premium: formData.policyPremium,
+          claimAmount: formData.policyClaimAmount,
+          daysLeft: daysLeftNum,
+          members,
+        }),
+      });
+
+      if (!response.ok) {
+        const msg = await response.text();
+        throw new Error(msg || "Failed to add policy");
+      }
+
+      toast.success("Policy added");
+      handleModalOpenChange(false);
+      await fetchPolicies();
+    } catch (error) {
+      console.error("Error adding policy:", error);
+      toast.error("Failed to add policy");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <>
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <Dialog open={isModalOpen} onOpenChange={handleModalOpenChange}>
         <DialogContent size="lg">
           <DialogHeader>Enter Policy Details Manually</DialogHeader>
           <FieldGroup>
             <Field>
-              <FieldLabel>Policy Number</FieldLabel>
-              <Input type="text" placeholder="Enter Policy Number" />
+              <FieldLabel>Policy Id</FieldLabel>
+              <Input
+                type="text"
+                placeholder="Enter Policy Id"
+                value={policyId}
+                onChange={(e) => {
+                  setPolicyId(e.target.value);
+                  setFormData((p) => ({ ...p, policyId: e.target.value }));
+                }}
+              />
             </Field>
           </FieldGroup>
-          <FieldGroup>
-            <Field>
-              <FieldLabel>Policy Type</FieldLabel>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Policy Type" />
+          <div className="flex gap-x-4 items-center">
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Policy Name</FieldLabel>
+                <Select
+                  value={formData.policyName}
+                  onValueChange={(v) => setFormData((p) => ({ ...p, policyName: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Policy Type" />
+                    <SelectContent>
+                      <SelectItem value="Health">Health</SelectItem>
+                      <SelectItem value="Auto">Auto</SelectItem>
+                      <SelectItem value="Life">Life</SelectItem>
+                      <SelectItem value="Travel">Travel</SelectItem>
+                      <SelectItem value="Home">Home</SelectItem>
+                    </SelectContent>
+                  </SelectTrigger>
+                </Select>
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Policy Status</FieldLabel>
+                <Select
+                  value={formData.policyStatus}
+                  onValueChange={(v) => setFormData((p) => ({ ...p, policyStatus: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Policy Status" />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Health">Health</SelectItem>
-                    <SelectItem value="Auto">Auto</SelectItem>
-                    <SelectItem value="Life">Life</SelectItem>
-                    <SelectItem value="Travel">Travel</SelectItem>
-                    <SelectItem value="Home">Home</SelectItem>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
                   </SelectContent>
-                </SelectTrigger>
-              </Select>
-            </Field>
-          </FieldGroup>
+                </Select>
+              </Field>
+            </FieldGroup>
+          </div>
+          <div className="flex gap-x-4 items-center">
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Policy Provider</FieldLabel>
+                <Input
+                  type="text"
+                  placeholder="Enter Policy Provider"
+                  value={formData.policyProvider}
+                  onChange={(e) => setFormData((p) => ({ ...p, policyProvider: e.target.value }))}
+                />
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Policy Coverage</FieldLabel>
+                <Input
+                  type="text"
+                  placeholder="Enter Policy Coverage"
+                  value={formData.policyCoverage}
+                  onChange={(e) => setFormData((p) => ({ ...p, policyCoverage: e.target.value }))}
+                />
+              </Field>
+            </FieldGroup>
+          </div>
+          <div className="flex gap-x-4 items-center">
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Policy Premium</FieldLabel>
+                <Input
+                  type="text"
+                  placeholder="Enter Policy Premium"
+                  value={formData.policyPremium}
+                  onChange={(e) => setFormData((p) => ({ ...p, policyPremium: e.target.value }))}
+                />
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Policy Claim Amount</FieldLabel>
+                <Input
+                  type="text"
+                  placeholder="Enter Policy Claim Amount"
+                  value={formData.policyClaimAmount}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, policyClaimAmount: e.target.value }))
+                  }
+                />
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Policy Days Left</FieldLabel>
+                <Input
+                  type="number"
+                  placeholder="Enter Policy Days Left"
+                  value={formData.policyDaysLeft}
+                  onChange={(e) => setFormData((p) => ({ ...p, policyDaysLeft: e.target.value }))}
+                />
+              </Field>
+            </FieldGroup>
+          </div>
           <FieldGroup>
             <Field>
-              <FieldLabel>Date of Birth</FieldLabel>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="justify-between">
-                    <span className={cn("truncate", !date && "text-muted-foreground")}>
-                      {date ? format(date, "PPP") : "Pick a date"}
-                    </span>
-                    <CalendarIcon
-                      size={16}
-                      className="shrink-0 text-muted-foreground/80 transition-colors group-hover:text-foreground"
-                      aria-hidden="true"
-                    />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="border-0 p-0 shadow-none" align="start">
-                  <Calendar
-                    mode="single"
-                    defaultMonth={date}
-                    selected={date}
-                    onSelect={setDate}
-                    captionLayout="dropdown"
-                    components={{
-                      DropdownNav: (props: DropdownNavProps) => {
-                        return (
-                          <div className="flex z-10 relative  items-center gap-2">
-                            {props.children}
-                          </div>
-                        );
-                      },
-                      Dropdown: (props: DropdownProps) => {
-                        return (
-                          <Select
-                            value={String(props.value)}
-                            onValueChange={(value) => {
-                              if (props.onChange) {
-                                handleCalendarChange(value, props.onChange);
-                              }
-                            }}
-                          >
-                            <SelectTrigger className=" font-medium first:grow" variant="outline">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-[min(26rem,var(--radix-select-content-available-height))]">
-                              {props.options?.map((option) => (
-                                <SelectItem
-                                  key={option.value}
-                                  value={String(option.value)}
-                                  disabled={option.disabled}
-                                >
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        );
-                      },
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
+              <FieldLabel>Policy Members</FieldLabel>
+              <Input
+                type="text"
+                placeholder="Enter Policy Members (comma separated)"
+                value={formData.policyMembers}
+                onChange={(e) => setFormData((p) => ({ ...p, policyMembers: e.target.value }))}
+              />
             </Field>
           </FieldGroup>
+          <Button
+            type="button"
+            className="justify-self-end"
+            onClick={handleAddPolicy}
+            disabled={submitting}
+          >
+            {submitting ? "Adding..." : "Add Policy"}
+          </Button>
         </DialogContent>
       </Dialog>
       <div className="w-full space-y-6">
         <div className="flex justify-between w-full items-center">
           <h3 className="font-medium text-3xl leading-8 tracking-4">My Policies</h3>
-          <Button className="gap-0.5" onClick={() => setIsModalOpen(true)}>
+          <Button className="gap-0.5" onClick={() => handleModalOpenChange(true)}>
             <PlusIcon className="size-5" /> Add
           </Button>
         </div>
@@ -209,24 +329,7 @@ const DashboardPage = () => {
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
               <p className="text-red-600 dark:text-red-400 mb-2">Error: {error}</p>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setError(null);
-                  setLoading(true);
-                  fetch("/api/policies")
-                    .then((res) => res.json())
-                    .then((data) => {
-                      console.log("Retry - Full API data:", data);
-                      setApiData(data);
-                      setLoading(false);
-                    })
-                    .catch((err) => {
-                      setError(err.message);
-                      setLoading(false);
-                    });
-                }}
-              >
+              <Button variant="outline" onClick={() => { setError(null); fetchPolicies(); }}>
                 Retry
               </Button>
             </div>
@@ -237,7 +340,7 @@ const DashboardPage = () => {
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
               <p className="text-muted-foreground mb-4">No policies found.</p>
-              <Button className="gap-0.5" onClick={() => setIsModalOpen(true)}>
+              <Button className="gap-0.5" onClick={() => handleModalOpenChange(true)}>
                 <PlusIcon className="size-5" /> Add Your First Policy
               </Button>
             </div>

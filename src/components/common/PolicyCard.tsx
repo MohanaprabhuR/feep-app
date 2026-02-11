@@ -4,13 +4,8 @@ import { Avatar, AvatarFallback, AvatarGroup, AvatarImage } from "@/components/u
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import {
-  CarFront,
-  Hospital,
-  House,
-  LifeBuoy,
-  PlaneTakeoff,
-} from "lucide-react";
+import { CarFront, Hospital, House, LifeBuoy, PlaneTakeoff } from "lucide-react";
+import Link from "next/link";
 
 interface Policy {
   policyId: string;
@@ -38,9 +33,9 @@ const PolicyCard: React.FC<PolicyCardProps> = ({ policy }) => {
       case "Auto":
         return "bg-[linear-gradient(180deg,#FCEFFF_0%,#FFFFFF_100%)]";
       case "Life":
-        return "bg-red-500";
+        return "bg-[linear-gradient(180deg,#F5F0FF_0%,#FFFFFF_100%)]";
       case "Travel":
-        return "bg-yellow-500";
+        return "bg-[linear-gradient(180deg,#FFF4E5_0%,#FFFFFF_100%)]";
       case "Home":
         return "bg-[linear-gradient(180deg,#FFF4E5_0%,#FFFFFF_100%)]";
       default:
@@ -83,85 +78,86 @@ const PolicyCard: React.FC<PolicyCardProps> = ({ policy }) => {
   };
 
   return (
-    <Card className={`bg-white ${getBackgroundClass()}`}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-x-1.5">
-            <div className="flex gap-x-1 items-center">
-              {getIcon()}
+    <Link href={`/policies/${policy.policyId}`}>
+      <Card className={`bg-white ${getBackgroundClass()}`}>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-x-1.5">
+              <div className="flex gap-x-1 items-center">
+                {getIcon()}
+                <span className="text-base font-medium leading-5 tracking-4 text-accent-foreground">
+                  {policy.type}
+                </span>
+              </div>
+              <div className="size-1 rounded-full bg-[#757575]"></div>
               <span className="text-base font-medium leading-5 tracking-4 text-accent-foreground">
-                {policy.type}
+                {policy.status}
               </span>
             </div>
-            <div className="size-1 rounded-full bg-[#757575]"></div>
-            <span className="text-base font-medium leading-5 tracking-4 text-accent-foreground">
-              {policy.status}
+            <span className="text-base font-medium leading-5 tracking-4 text-muted-foreground">
+              {policy.policyId}
             </span>
           </div>
-          <span className="text-base font-medium leading-5 tracking-4 text-muted-foreground">
-            {policy.policyId}
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex justify-between">
-          <div className="flex justify-between items-center w-full">
-            <div className="flex flex-col">
-              <span className="font-medium text-xl leading-6 tracking-4 text-accent-foreground">
-                {policy.provider}
-              </span>
-              <span className="text-muted-foreground text-base font-medium leading-6 tracking-4">
-                Coverage:&nbsp;{policy.coverage}
-              </span>
-            </div>
-            <div className="p-0.5 bg-white rounded-lg">
-              <Image
-                src={
-                  policy.providerLogo ||
-                  "https://mockmind-api.uifaces.co/content/human/80.jpg"
-                }
-                alt={`${policy.provider}`}
-                width={44}
-                height={44}
-                className="object-contain rounded-md overflow-hidden"
-              />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-between">
+            <div className="flex justify-between items-center w-full">
+              <div className="flex flex-col">
+                <span className="font-medium text-xl leading-6 tracking-4 text-accent-foreground">
+                  {policy.provider}
+                </span>
+                <span className="text-muted-foreground text-base font-medium leading-6 tracking-4">
+                  Coverage:&nbsp;{policy.coverage}
+                </span>
+              </div>
+              <div className="p-0.5 bg-white rounded-lg">
+                <Image
+                  src={
+                    policy.providerLogo || "https://mockmind-api.uifaces.co/content/human/80.jpg"
+                  }
+                  alt={`${policy.provider}`}
+                  width={44}
+                  height={44}
+                  className="object-contain rounded-md overflow-hidden"
+                />
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex justify-between">
-          <div className="flex text-sm flex-col">
-            <span className="text-muted-foreground text-base font-medium leading-5 tracking-4">
-              Premium
-            </span>
-            <span className="text-accent-foreground text-lg font-medium leading-6 tracking-4">
-              {policy.premium}
-            </span>
+          <div className="flex justify-between">
+            <div className="flex text-sm flex-col">
+              <span className="text-muted-foreground text-base font-medium leading-5 tracking-4">
+                Premium
+              </span>
+              <span className="text-accent-foreground text-lg font-medium leading-6 tracking-4">
+                {policy.premium}
+              </span>
+            </div>
+            <div className="flex text-sm flex-col">
+              <span className="text-muted-foreground">Claims Amt</span>
+              <span className="font-medium">{policy.claimAmount}</span>
+            </div>
+            <div className="flex text-sm flex-col">
+              <span className="text-muted-foreground">Members</span>
+              <AvatarGroup max={3} size="md">
+                {policy.members.map((member, index) => (
+                  <Avatar key={index} size="md">
+                    <AvatarImage src={member.avatar} />
+                    <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                ))}
+              </AvatarGroup>
+            </div>
           </div>
-          <div className="flex text-sm flex-col">
-            <span className="text-muted-foreground">Claims Amt</span>
-            <span className="font-medium">{policy.claimAmount}</span>
+          <div className="flex items-center text-sm mt-1">
+            <Progress
+              value={Math.max(0, Math.min(100, 100 - policy.daysLeft))}
+              className={getProgressColor()}
+            />
+            <Button variant="outline">{policy.daysLeft} days left</Button>
           </div>
-          <div className="flex text-sm flex-col">
-            <span className="text-muted-foreground">Members</span>
-            <AvatarGroup max={3} size="md">
-              {policy.members.map((member, index) => (
-                <Avatar key={index} size="md">
-                  <AvatarImage src={member.avatar} />
-                  <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-              ))}
-            </AvatarGroup>
-          </div>
-        </div>
-        <div className="flex items-center text-sm mt-1">
-          <Progress
-            value={Math.max(0, Math.min(100, 100 - policy.daysLeft))}
-            className={getProgressColor()}
-          />
-          <Button variant="outline">{policy.daysLeft} days left</Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </Link>
   );
 };
 
